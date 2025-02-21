@@ -1,0 +1,275 @@
+const mongoose = require('mongoose');
+const Empleado = require('../models/Empleado');
+const nominaService = require('../services/calculadorDeNominaService');
+const {Schema } = mongoose;
+
+
+
+const Nomina = require('../models/Nomina');
+const HorasTrabajadas = require('../models/HorasTrabajadas');
+// Crear una nueva nómina
+exports.createNomina = async (req, res) => {
+    try {
+        const { idEmpleado, idSemana } = req.body;
+
+        // Verificar si ya existe una nómina con el mismo idEmpleado y idSemana
+        const existeNomina = await Nomina.findOne({ idEmpleado, idSemana });
+        if (existeNomina) {
+            return res.status(400).json({
+                message: 'Ya existe una nómina registrada para este empleado en esta semana',
+            });
+        }
+
+        // Crear la nueva nómina si no existe
+        const nuevaNomina = new Nomina(req.body);
+        const nominaGuardada = await nuevaNomina.save();
+        res.status(201).json(nominaGuardada);
+    } catch (error) {
+        res.status(400).json({ message: 'Error al crear la nómina', error });
+    }
+};
+
+exports.verificarOCrearNomina = async (req, res) => {
+    const { idSemana, idEmpleado, ...nominaData } = req.body;
+
+    try {
+        // Verificar si ya existe una nómina con el mismo idSemana y idEmpleado
+        const existingNomina = await Nomina.findOne({ idSemana, idEmpleado });
+        
+        if (existingNomina) {
+            return res.status(400).json({ message: "La nómina ya existe para el idSemana e idEmpleado especificados." });
+        }
+
+        // Si no existe, crea una nueva nómina con los datos recibidos
+        const nuevaNomina = new Nomina({ idSemana, idEmpleado, ...nominaData });
+        await nuevaNomina.save();
+
+        return res.status(201).json({ message: "Nómina creada exitosamente.", nomina: nuevaNomina });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: "Error al crear la nómina.", error });
+    }
+};
+
+// Obtener todas las nóminas
+exports.getNominas = async (req, res) => {
+    try {
+        const nominas = await Nomina.find();
+        res.status(200).json(nominas);
+    } catch (error) {
+        res.status(500).json({ message: 'Error al obtener las nóminas', error });
+    }   
+};
+
+// Obtener una nómina por ID
+exports.getNominaById = async (req, res) => {
+    try {
+        const { idSemana, idEmpleado } = req.params;
+        const nomina = await Nomina.findOne({ idSemana, idEmpleado });
+        if (!nomina) {
+            return res.status(404).json({ message: 'Nómina no encontrada' });
+        }
+        res.status(200).json(nomina);
+    } catch (error) {
+        res.status(500).json({ message: 'Error al obtener la nómina', error });
+    }
+};
+
+// Actualizar una nómina por ID
+exports.updateNomina = async (req, res) => {
+    try {
+        const { idSemana, idEmpleado } = req.params;
+        const nominaActualizada = await Nomina.findOneAndUpdate(
+            { idSemana, idEmpleado },
+            req.body,
+            { new: true } // Devuelve el documento actualizado
+        );
+        if (!nominaActualizada) {
+            return res.status(404).json({ message: 'Nómina no encontrada' });
+        }
+        res.status(200).json(nominaActualizada);
+    } catch (error) {
+        res.status(400).json({ message: 'Error al actualizar la nómina', error });
+    }
+};
+
+// Eliminar una nómina por ID
+
+exports.deleteNomina = async (req, res) => {
+    try {
+        console.log("SE VA A ELIMINAR");
+        const { idSemana, idEmpleado } = req.params;
+
+        // Eliminar la nómina correspondiente
+        const nominaEliminada = await Nomina.findOneAndDelete({ idSemana, idEmpleado });
+        if (!nominaEliminada) {
+            return res.status(404).json({ message: 'Nómina no encontrada' });
+        }
+
+        const horasExistentes = await HorasTrabajadas.find({
+            idSemana: String(idSemana),
+            idEmpleado: String(idEmpleado)
+        });
+        console.log('Horas encontradas antes de eliminar:', horasExistentes);
+        // Eliminar todas las horas trabajadas correspondientes a la misma idSemana y idEmpleado
+        const horasEliminadas = await HorasTrabajadas.deleteMany({
+            idSemana: String(idSemana),
+            idEmpleado: String(idEmpleado)
+        });
+
+        res.status(200).json({ 
+            message: 'Nómina y horas trabajadas eliminadas correctamente',
+            detalles: {
+                nominaEliminada,
+                horasEliminadas: horasEliminadas.deletedCount // Cantidad de documentos eliminados
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Error al eliminar la nómina y horas trabajadas', error });
+    }
+};
+
+
+exports.getNominasBySemana = async (req, res) => {
+    try {
+        const { idSemana } = req.params;
+        const nominas = await Nomina.find({ idSemana });
+        if (nominas.length === 0) {
+            return res.status(404).json({ message: 'No se encontraron nóminas para esta semana' });
+        }
+        res.status(200).json(nominas);
+    } catch (error) {
+        res.status(500).json({ message: 'Error al obtener las nóminas', error });
+    }
+};
+
+
+// NUEVAS FUNCIONES NOMINAS
+
+exports.getNominaByIdNomina = async(req,res)=>{
+    try{
+        const nomina = await Nomina.findById(req.params.id);
+        if (!nomina) {
+            return res.status(404).json({ message: 'Nomina not found' });
+        }
+        res.status(200).json(nomina);
+    }
+    catch(error){
+        res.status(500).json({ message: 'Error al obtener las nóminas', error });
+    }
+}
+exports.putNominaByIdNomina = async (req, res) => {
+    const { id } = req.params; // Obtener el _id de la nómina desde la URL
+    const nuevosCampos = req.body; // Obtener los campos a actualizar desde el cuerpo de la solicitud
+
+    try {
+        // Actualizar la nómina
+        const nominaActualizada = await Nomina.findByIdAndUpdate(
+            id,
+            { $set: nuevosCampos }, // Actualizar solo los campos especificados
+            { new: true, runValidators: true } // Retorna el documento actualizado y valida
+        );
+
+        if (!nominaActualizada) {
+            return res.status(404).json({ mensaje: 'Nómina no encontrada' });
+        }
+
+        // Buscar el empleado asociado a la nómina
+        const empleado = await Empleado.findById(nominaActualizada.idEmpleado);
+        if (!empleado) {
+            return res.status(404).json({ mensaje: 'Empleado no encontrado' });
+        }
+
+        // Sumar prestamo a deuda actual
+        // empleado.deuda += nuevosCampos.prestamo || 0;
+
+        // Sustituir abono por el nuevo valor
+        empleado.abono = nuevosCampos.abonan || 0;
+
+        // Sustituir sumaDeuda con el prestamo de la nomina
+        empleado.sumaDeuda = nuevosCampos.prestamo || 0;
+
+        // Guardar los cambios en el empleado
+        await empleado.save();
+
+        res.status(200).json({ 
+            mensaje: 'Nómina y datos del empleado actualizados con éxito.', 
+            nomina: nominaActualizada,
+            empleado
+        });
+    } catch (error) {
+        console.error('Error al actualizar la nómina:', error);
+        res.status(500).json({ mensaje: 'Error al actualizar la nómina', error });
+    }
+};
+
+
+
+
+exports.alternarCalculadoNomina = async (req, res) => {
+    const { idNomina } = req.params;
+
+    try {
+        // Buscar la nómina por _id
+        const nomina = await Nomina.findById(idNomina);
+        if (!nomina) {
+            return res.status(404).json({ message: 'Nómina no encontrada.' });
+        }
+
+        // Alternar el valor de 'calculado'
+        nomina.calculado = !nomina.calculado;
+        await nomina.save();
+
+        return res.status(200).json({
+            message: 'Estado de calculado alternado correctamente.',
+            calculado: nomina.calculado
+        });
+    } catch (error) {
+        console.error('Error al alternar el estado de calculado:', error);
+        return res.status(500).json({ message: 'Error al alternar el estado de calculado.', error });
+    }
+};
+
+
+exports.obtenerPrestamosAbonos = async (req, res) => {
+    const { idSemana } = req.params; // Obtenemos idSemana desde los query params
+
+    if (!idSemana) {
+        return res.status(400).json({ error: 'El parámetro idSemana es requerido' });
+    }
+
+    try {
+        const resultado = await Nomina.aggregate([
+            {
+                $match: { idSemana } // Filtrar por idSemana
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalAbonos: { $sum: "$abonan" },
+                    totalPrestamos: { $sum: "$prestamo" }
+                }
+            }
+        ]);
+
+        const sumas = resultado[0] || { totalAbonos: 0, totalPrestamos: 0 };
+        res.json(sumas); // Devolvemos el resultado en formato JSON
+    } catch (error) {
+        console.error("Error al obtener sumas:", error);
+        res.status(500).json({ error: 'Error en el servidor' });
+    }
+}
+
+
+
+// Para cuando se necesita hacer un recalculo desde el back
+exports.recalcularNomina = async(req,res) => {
+    try{
+        const {idSemana,idEmpleado} = req.params;
+        const nuevaNomina = await nominaService.recalcularNomina(idSemana,idEmpleado);
+        res.status(200).json(nuevaNomina);
+    }
+    catch(error){
+        return res.status(500).json({error});
+    }
+}

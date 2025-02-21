@@ -1,0 +1,134 @@
+const horasTrabajadasController = require('../controllers/horasTrabajadasController')
+const HorasTrabajadas = require('../models/HorasTrabajadas');
+const Empleado = require('../models/Empleado');
+
+
+const calcularAguinaldo = async(idEmpleado,anio) =>{
+    try{
+        const horasTrabajadas = await obtenerHorasTrabajadas(idEmpleado,anio);
+        const empleado = await obtenerEmpleado(idEmpleado);
+        console.log(horasTrabajadas);
+     
+        const pagoHora = empleado.pago;
+        const diasTrabajados = horasTrabajadas / 9.6; // Asumiendo 9.6 horas/día
+        const salarioDiario = pagoHora * 9.6;
+        const aguinaldo = (diasTrabajados / 365) * (15 * salarioDiario);
+
+        const aguinaldoObj = {
+            pagoHora,
+            diasTrabajados,
+            salarioDiario,
+            aguinaldo,
+        };
+      
+        console.log(aguinaldoObj,"Aguinaldo objeto");
+
+        return aguinaldoObj;
+
+    }
+    catch(error){
+        console.error("Error al obtener las horas regulares:", error);
+    }
+
+}
+
+
+const obtenerHorasTrabajadas = async(idEmpleado,year) => {
+    try {
+        // Calcular el rango de fechas para el año ingresado
+        const fechaInicio = new Date(`${year}-01-01T00:00:00Z`);
+        const fechaFin = new Date(`${year}-12-31T23:59:59Z`);
+
+        // Consultar las horas regulares del empleado dentro del rango de fechas
+        const horasRegulares = await HorasTrabajadas.aggregate([
+            {
+                $match: {
+                    idEmpleado: idEmpleado,
+                    sonHorasExtra: false, // Solo horas regulares
+                    fecha: { $gte: fechaInicio, $lte: fechaFin }
+                }
+            },
+            {
+                $group: {
+                    _id: null, // Agrupar todo en un solo resultado
+                    totalHoras: { $sum: "$horasTrabajadas" } // Sumar las horas trabajadas
+                }
+            }
+        ]);
+
+        // Si no hay registros, devolver 0
+        if (horasRegulares.length === 0) return 0;
+
+        return horasRegulares[0].totalHoras;
+    } catch (error) {
+        console.error("Error al obtener las horas regulares:", error);
+        throw new Error("No se pudieron calcular las horas regulares");
+    }
+}
+
+const obtenerEmpleado = async (idEmpleado) =>{
+    try {
+        // console.log("WTF");
+        const empleado = await Empleado.findById(idEmpleado);// Obtén solo el campo 'pago'
+        
+        if (empleado) {
+            // console.log(`El pago del empleado con ID ${idEmpleado} es: ${empleado.pago}`);
+            return empleado;
+        } else {
+            // console.log(`No se encontró ningún sempleado con el ID ${idEmpleado}`);
+            return null;
+        }
+    } catch (error) {
+        console.error(`Error al obtener el pago del empleado: ${error.message}`);
+        throw error;
+    }
+}
+
+
+
+// CALCULA LA PRIMA DOMINICAL
+
+
+const buscarHorasDomingoAnterior = async (idEmpleado, idSemana) => {
+    try {
+        console.log(idEmpleado + " " + idSemana);
+        
+        const horas = await HorasTrabajadas.findOne({
+            idEmpleado: idEmpleado,
+            idSemana: idSemana,
+            diaSemana: "Domingo anterior"
+        });
+
+        if (horas) {
+            const prima = await primaDominical(idEmpleado);
+            return prima;
+        } else {
+            console.log("No hay horas registradas en Domingo anterior.");
+            return 0;
+        }
+    } catch (error) {
+        console.error("Error al buscar horas:", error);
+        throw error;
+    }
+};
+
+
+const primaDominical = async (idEmpleado) => {
+    try{
+        console.log(idEmpleado);
+        const datosEmpleado = await Empleado.findById(idEmpleado);
+        
+        const pagoHora = datosEmpleado.pago;
+        const pagoDiario = pagoHora * 9.6;
+        const primaDominical = pagoDiario * 0.25;
+        return primaDominical;
+    }
+    catch(error){
+        throw error;
+    }
+}
+
+module.exports = {
+    calcularAguinaldo,
+    buscarHorasDomingoAnterior
+}

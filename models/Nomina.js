@@ -1,0 +1,132 @@
+const mongoose = require('mongoose');
+const {Schema } = mongoose;
+const DiasSemana = require('./DiaSemanaNomina');
+
+const NominaSchema = new Schema({
+    // ID COMPUESTO
+    idSemana: {
+        type: String,
+    
+        required: true
+    },
+    idEmpleado: {
+        type: String,
+    
+        required: true
+    },
+    idEmp:{
+        type:Number,
+        required:true
+    },
+
+
+    nombreEmpleado: {
+        type: String,
+        
+        required: true
+    },
+    sueldoMes: {
+        type: Number,
+        
+        required: false
+    },
+    sueldoHora: {
+        type: Number,
+        
+        required: true
+    },
+    banco: {
+        type: String,
+        
+        required: true
+    },
+    cuenta:{
+        type:String,
+        required:true,
+    },
+    tarjeta: {
+        type: String,
+        
+        required: true
+    },
+    // Son las horas regulares
+    horasFaltantes:{
+        type:Number,
+        required:false,
+        default:0
+    },
+    horasRegulares:{
+        type:Number,
+        required:false,
+        default:0,
+    },
+    horasExtras:{
+        type:Number,
+        required:false,
+        default:0
+    },
+
+
+    sobreSueldo: {
+        type: Number,
+        required: false,
+        default: 0
+    },
+    finiquito: {
+        type: Number,
+        required: false,
+        default: 0
+    },
+    totalNomina: {
+        type: Number,
+        required: false,
+        default: 0
+    },
+    deben: {
+        type: Number,
+        required: false,
+        default: 0
+    },
+    prestamo: {
+        type: Number,
+        required: false,
+        default: 0
+    },
+    abonan: {
+        type: Number,
+        required: false,
+        default: 0
+    },
+    pension: {
+        type: Number,
+        required: false,
+        default: 0
+    },
+    lesDoy: {
+        type: Number,
+        required: false,
+        default: 0
+    },
+    nominaFiscal: {
+        type: Number,
+        required: false,
+        default: 0
+    },
+    dispEfectivo: {
+        type: Number,
+        required: false,
+        default: 0
+    },
+    calculado:{
+        type:Boolean,
+        required:false,
+        default:false
+    }
+
+});
+
+
+
+
+
+module.exports = mongoose.model('Nomina',NominaSchema);
